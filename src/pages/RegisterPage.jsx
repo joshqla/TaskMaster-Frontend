@@ -10,7 +10,7 @@ function RegisterPage() {
 
   const handleRegister = async () => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', { email, password });
+      const res = await axios.post('https://taskmaster-backend-ceqf.onrender.com/api/auth/register', { email, password });
       alert(res.data.message); // "Usuário criado!"
     } catch (error) {
       alert('Erro ao registrar: ' + (error.response?.data?.error || 'Tente novamente'));

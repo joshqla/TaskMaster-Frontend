@@ -16,7 +16,7 @@ function Home() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/tasks', {
+        const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/tasks', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setTasks(res.data);
@@ -30,7 +30,7 @@ function Home() {
   const handleAddTask = async () => {
     try {
       const res = await axios.post(
-        'http://localhost:5000/api/tasks',
+        'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
         { title },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -45,7 +45,7 @@ function Home() {
     if (!editTask) return;
     try {
       const res = await axios.put(
-        `http://localhost:5000/api/tasks/${editTask._id}`,
+        `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${editTask._id}`,
         editTask,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -58,7 +58,7 @@ function Home() {
 
   const handleDeleteTask = async (id) => {
     try {
-      await axios.delete(`http://localhost:5000/api/tasks/${id}`, {
+      await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setTasks(tasks.filter((t) => t._id !== id));
@@ -71,7 +71,7 @@ function Home() {
     try {
       const updatedTask = { ...task, completed: !task.completed };
       const res = await axios.put(
-        `http://localhost:5000/api/tasks/${task._id}`,
+        `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${task._id}`,
         updatedTask,
         { headers: { Authorization: `Bearer ${token}` } }
       );
