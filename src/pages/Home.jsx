@@ -4,20 +4,24 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from "lucide-react" // Novo
+import { Loader2 } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
 import axios from 'axios';
 
 function Home() {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
+  const [dueDate, setDueDate] = useState(null); // Novo
   const [editTask, setEditTask] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(false); // Novo
+  const [loading, setLoading] = useState(false);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     const fetchTasks = async () => {
-      setLoading(true); // Novo
+      setLoading(true);
       try {
         const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/tasks', {
           headers: { Authorization: `Bearer ${token}` },
@@ -26,32 +30,33 @@ function Home() {
       } catch (error) {
         console.error('Erro ao buscar tarefas:', error);
       } finally {
-        setLoading(false); // Novo
+        setLoading(false);
       }
     };
     if (token) fetchTasks();
   }, [token]);
 
   const handleAddTask = async () => {
-    setLoading(true); // Novo
+    setLoading(true);
     try {
       const res = await axios.post(
         'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
-        { title },
+        { title, dueDate }, // Novo
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTasks([...tasks, res.data]);
       setTitle('');
+      setDueDate(null); // Novo
     } catch (error) {
-      alert('Erro ao adicionar tarefa');
+      alert('Erro ao adicionar tarefa: ' + (error.response?.data?.error || 'Tente novamente'));
     } finally {
-      setLoading(false); // Novo
+      setLoading(false);
     }
   };
 
   const handleUpdateTask = async () => {
     if (!editTask) return;
-    setLoading(true); // Novo
+    setLoading(true);
     try {
       const res = await axios.put(
         `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${editTask._id}`,
@@ -63,12 +68,12 @@ function Home() {
     } catch (error) {
       alert('Erro ao atualizar tarefa');
     } finally {
-      setLoading(false); // Novo
+      setLoading(false);
     }
   };
 
   const handleDeleteTask = async (id) => {
-    setLoading(true); // Novo
+    setLoading(true);
     try {
       await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -77,12 +82,12 @@ function Home() {
     } catch (error) {
       alert('Erro ao excluir tarefa');
     } finally {
-      setLoading(false); // Novo
+      setLoading(false);
     }
   };
 
   const handleToggleComplete = async (task) => {
-    setLoading(true); // Novo
+    setLoading(true);
     try {
       const updatedTask = { ...task, completed: !task.completed };
       const res = await axios.put(
@@ -94,7 +99,7 @@ function Home() {
     } catch (error) {
       alert('Erro ao atualizar status da tarefa');
     } finally {
-      setLoading(false); // Novo
+      setLoading(false);
     }
   };
 
@@ -104,6 +109,8 @@ function Home() {
     return true;
   });
 
+  const isOverdue = (date) => date && new Date(date) < new Date() && !task.completed;
+
   return (
     <div className="p-4 max-w-2xl mx-auto bg-background">
       <h1 className="text-2xl font-bold mb-4">Minhas Tarefas</h1>
@@ -112,8 +119,23 @@ function Home() {
           placeholder="Nova tarefa"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          disabled={loading} // Novo
+          disabled={loading}
         />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" disabled={loading}>
+              {dueDate ? format(dueDate, 'PPP') : 'Data'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={dueDate}
+              onSelect={setDueDate}
+              disabled={loading}
+            />
+          </PopoverContent>
+        </Popover>
         <Button onClick={handleAddTask} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
         </Button>
@@ -136,14 +158,21 @@ function Home() {
       )}
       <div className="space-y-2">
         {filteredTasks.map((task) => (
-          <Card key={task._id} className="flex items-center justify-between animate-in fade-in duration-300">
+          <Card key={task._id} className="flex items-center justify-between animate-in slide-in-from-top-3 duration-500">
             <CardContent className="p-4 flex items-center space-x-2">
               <Checkbox
                 checked={task.completed}
                 onCheckedChange={() => handleToggleComplete(task)}
                 disabled={loading}
               />
-              <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
+              <div>
+                <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
+                {task.dueDate && (
+                  <p className={`text-sm ${isOverdue(task.dueDate) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {format(new Date(task.dueDate), 'PPP')}
+                  </p>
+                )}
+              </div>
             </CardContent>
             <div className="p-4 space-x-2">
               <Dialog>
@@ -153,7 +182,7 @@ function Home() {
                   </Button>
                 </DialogTrigger>
                 {editTask && (
-                  <DialogContent className="animate-in zoom-in-90 duration-200">
+                  <DialogContent className="animate-in zoom-in-75 duration-300">
                     <DialogHeader>
                       <DialogTitle>Editar Tarefa</DialogTitle>
                     </DialogHeader>
@@ -163,6 +192,21 @@ function Home() {
                         onChange={(e) => setEditTask({ ...editTask, title: e.target.value })}
                         disabled={loading}
                       />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" disabled={loading}>
+                            {editTask.dueDate ? format(new Date(editTask.dueDate), 'PPP') : 'Data'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={editTask.dueDate ? new Date(editTask.dueDate) : null}
+                            onSelect={(date) => setEditTask({ ...editTask, dueDate: date })}
+                            disabled={loading}
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <Checkbox
                         checked={editTask.completed}
                         onCheckedChange={(checked) => setEditTask({ ...editTask, completed: checked })}
