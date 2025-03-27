@@ -10,12 +10,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import axios from 'axios';
 
 function Home() {
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState([]); // Já inicializado como array vazio
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -36,14 +36,15 @@ function Home() {
         const res = await axios.get(`https://taskmaster-backend-ceqf.onrender.com/api/tasks?sort=${sortBy}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setTasks(res.data);
+        setTasks(res.data || []); // Garante que tasks é sempre um array
       } catch (error) {
         console.error('Erro ao buscar tarefas:', error.response?.data || error.message);
+        setTasks([]); // Em caso de erro, seta como vazio
       } finally {
         setLoading(false);
       }
     };
-    if (token) fetchTasks();
+    fetchTasks();
   }, [token, sortBy]);
 
   const handleAddTask = async () => {
@@ -55,7 +56,7 @@ function Home() {
         { title, description, priority, dueDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks([...tasks, res.data]);
+      setTasks((prevTasks) => [...prevTasks, res.data]);
       setTitle('');
       setDescription('');
       setPriority('medium');
@@ -76,7 +77,7 @@ function Home() {
         editTask,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks(tasks.map((t) => (t._id === editTask._id ? res.data : t)));
+      setTasks((prevTasks) => prevTasks.map((t) => (t._id === editTask._id ? res.data : t)));
       setEditTask(null);
     } catch (error) {
       alert('Erro ao atualizar tarefa');
@@ -92,7 +93,7 @@ function Home() {
       await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${deleteTaskId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTasks(tasks.filter((t) => t._id !== deleteTaskId));
+      setTasks((prevTasks) => prevTasks.filter((t) => t._id !== deleteTaskId));
       setDeleteTaskId(null);
     } catch (error) {
       alert('Erro ao excluir tarefa');
@@ -111,7 +112,7 @@ function Home() {
         updatedTask,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks(tasks.map((t) => (t._id === task._id ? res.data : t)));
+      setTasks((prevTasks) => prevTasks.map((t) => (t._id === task._id ? res.data : t)));
     } catch (error) {
       alert('Erro ao atualizar status da tarefa');
     } finally {
@@ -147,7 +148,7 @@ function Home() {
         const res = await axios.get(`https://taskmaster-backend-ceqf.onrender.com/api/tasks?sort=${sortBy}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setTasks(res.data);
+        setTasks(res.data || []);
         alert('Tarefas importadas com sucesso!');
       } catch (error) {
         alert('Erro ao importar tarefas: ' + (error.response?.data?.error || 'Formato inválido'));
@@ -161,23 +162,31 @@ function Home() {
     window.location.href = '/login';
   };
 
-  const filteredTasks = tasks.filter((task) => {
-    const matchesFilter = filter === 'all' || (filter === 'pending' && !task.completed) || (filter === 'completed' && task.completed) || (filter === 'overdue' && isOverdue(task.dueDate, task.completed));
-    const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase()) || (task.description && task.description.toLowerCase().includes(search.toLowerCase()));
+  const isOverdue = (date, completed) => date && new Date(date) < new Date() && !completed;
+
+  const filteredTasks = (tasks || []).filter((task) => {
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'pending' && !task.completed) ||
+      (filter === 'completed' && task.completed) ||
+      (filter === 'overdue' && isOverdue(task.dueDate, task.completed));
+    const matchesSearch =
+      task.title.toLowerCase().includes(search.toLowerCase()) ||
+      (task.description && task.description.toLowerCase().includes(search.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
 
-  const overdueCount = tasks.filter((t) => isOverdue(t.dueDate, t.completed)).length;
-  const pendingCount = tasks.filter((t) => !t.completed).length;
-  const completedCount = tasks.filter((t) => t.completed).length;
-
-  const isOverdue = (date, completed) => date && new Date(date) < new Date() && !completed;
+  const overdueCount = (tasks || []).filter((t) => isOverdue(t.dueDate, t.completed)).length;
+  const pendingCount = (tasks || []).filter((t) => !t.completed).length;
+  const completedCount = (tasks || []).filter((t) => t.completed).length;
 
   return (
     <div className="p-4 max-w-2xl mx-auto bg-background">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Minhas Tarefas</h1>
-        <Button variant="outline" onClick={handleLogout} disabled={loading}>Logout</Button>
+        <Button variant="outline" onClick={handleLogout} disabled={loading}>
+          Logout
+        </Button>
       </div>
       <div className="flex space-x-2 mb-4">
         <Badge variant="secondary">Pendentes: {pendingCount}</Badge>
@@ -198,12 +207,7 @@ function Home() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={dueDate}
-              onSelect={setDueDate}
-              disabled={loading}
-            />
+            <Calendar mode="single" selected={dueDate} onSelect={setDueDate} disabled={loading} />
           </PopoverContent>
         </Popover>
         <Select value={priority} onValueChange={setPriority} disabled={loading}>
@@ -234,7 +238,9 @@ function Home() {
           onChange={(e) => setSearch(e.target.value)}
           disabled={loading}
         />
-        <Button variant="outline" onClick={handleExportTasks} disabled={loading}>Exportar</Button>
+        <Button variant="outline" onClick={handleExportTasks} disabled={loading}>
+          Exportar
+        </Button>
         <Button variant="outline" as="label" disabled={loading}>
           Importar
           <input type="file" accept=".json" onChange={handleImportTasks} className="hidden" />
@@ -309,7 +315,7 @@ function Home() {
                     Editar
                   </Button>
                 </DialogTrigger>
-                {editTask && (
+                {editTask && editTask._id === task._id && (
                   <DialogContent className="animate-in zoom-in-75 duration-300">
                     <DialogHeader>
                       <DialogTitle>Editar Tarefa</DialogTitle>
@@ -373,18 +379,24 @@ function Home() {
                     Excluir
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Tem certeza que deseja excluir a tarefa "{tasks.find(t => t._id === deleteTaskId)?.title}"?
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setDeleteTaskId(null)} disabled={loading}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteTask} disabled={loading}>Excluir</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
+                {deleteTaskId === task._id && (
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir a tarefa "{task.title}"?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setDeleteTaskId(null)} disabled={loading}>
+                        Cancelar
+                      </AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteTask} disabled={loading}>
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                )}
               </AlertDialog>
             </div>
           </Card>
