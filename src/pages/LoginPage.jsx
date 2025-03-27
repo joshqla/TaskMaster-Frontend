@@ -7,15 +7,19 @@ import axios from 'axios';
 function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    setLoading(true);
     try {
-      const res = await axios.post('https://taskmaster-backend-ceqf.onrender.com/api/auth/login', { email, password });
+      const res = await axios.post('https://taskmaster-backend-ceqf.onrender.com/api/auth/login', { email, password }, { timeout: 30000 });
       localStorage.setItem('token', res.data.token);
       alert('Login bem-sucedido!');
       onLoginSuccess();
     } catch (error) {
       alert('Erro ao fazer login');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,8 +43,8 @@ function LoginPage({ onLoginSuccess }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <Button onClick={handleLogin} className="w-full">
-              Entrar
+            <Button onClick={handleLogin} className="w-full" disabled={loading}>
+              {loading ? 'Carregando...' : 'Entrar'}
             </Button>
           </div>
         </CardContent>
