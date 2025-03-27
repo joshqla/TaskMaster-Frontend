@@ -7,20 +7,23 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Novo
 import { format } from 'date-fns';
 import axios from 'axios';
 
 function Home() {
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
-  const [dueDate, setDueDate] = useState(null); // Novo
+  const [dueDate, setDueDate] = useState(null);
   const [editTask, setEditTask] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('dueDate-asc'); // Novo: padrão por data crescente
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     const fetchTasks = async () => {
+      if (!token) return;
       setLoading(true);
       try {
         const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/tasks', {
@@ -28,7 +31,7 @@ function Home() {
         });
         setTasks(res.data);
       } catch (error) {
-        console.error('Erro ao buscar tarefas:', error);
+        console.error('Erro ao buscar tarefas:', error.response?.data || error.message);
       } finally {
         setLoading(false);
       }
@@ -37,16 +40,17 @@ function Home() {
   }, [token]);
 
   const handleAddTask = async () => {
+    if (!token) return;
     setLoading(true);
     try {
       const res = await axios.post(
         'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
-        { title, dueDate }, // Novo
+        { title, dueDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTasks([...tasks, res.data]);
       setTitle('');
-      setDueDate(null); // Novo
+      setDueDate(null);
     } catch (error) {
       alert('Erro ao adicionar tarefa: ' + (error.response?.data?.error || 'Tente novamente'));
     } finally {
@@ -55,7 +59,7 @@ function Home() {
   };
 
   const handleUpdateTask = async () => {
-    if (!editTask) return;
+    if (!editTask || !token) return;
     setLoading(true);
     try {
       const res = await axios.put(
@@ -73,6 +77,7 @@ function Home() {
   };
 
   const handleDeleteTask = async (id) => {
+    if (!token) return;
     setLoading(true);
     try {
       await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${id}`, {
@@ -87,6 +92,7 @@ function Home() {
   };
 
   const handleToggleComplete = async (task) => {
+    if (!token) return;
     setLoading(true);
     try {
       const updatedTask = { ...task, completed: !task.completed };
@@ -109,7 +115,23 @@ function Home() {
     return true;
   });
 
-  const isOverdue = (date) => date && new Date(date) < new Date() && !task.completed;
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (sortBy === 'dueDate-asc') {
+      const dateA = a.dueDate ? new Date(a.dueDate) : Infinity;
+      const dateB = b.dueDate ? new Date(b.dueDate) : Infinity;
+      return dateA - dateB;
+    }
+    if (sortBy === 'dueDate-desc') {
+      const dateA = a.dueDate ? new Date(a.dueDate) : -Infinity;
+      const dateB = b.dueDate ? new Date(b.dueDate) : -Infinity;
+      return dateB - dateA;
+    }
+    if (sortBy === 'completed-asc') return a.completed ? 1 : -1;
+    if (sortBy === 'completed-desc') return a.completed ? -1 : 1;
+    return 0;
+  });
+
+  const isOverdue = (date, completed) => date && new Date(date) < new Date() && !completed;
 
   return (
     <div className="p-4 max-w-2xl mx-auto bg-background">
@@ -150,6 +172,17 @@ function Home() {
         <Button variant={filter === 'completed' ? 'default' : 'outline'} onClick={() => setFilter('completed')} disabled={loading}>
           Concluídas
         </Button>
+        <Select value={sortBy} onValueChange={setSortBy} disabled={loading}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="dueDate-asc">Data (Crescente)</SelectItem>
+            <SelectItem value="dueDate-desc">Data (Decrescente)</SelectItem>
+            <SelectItem value="completed-asc">Concluídas Último</SelectItem>
+            <SelectItem value="completed-desc">Concluídas Primeiro</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       {loading && (
         <div className="flex justify-center mb-4">
@@ -157,7 +190,7 @@ function Home() {
         </div>
       )}
       <div className="space-y-2">
-        {filteredTasks.map((task) => (
+        {sortedTasks.map((task) => (
           <Card key={task._id} className="flex items-center justify-between animate-in slide-in-from-top-3 duration-500">
             <CardContent className="p-4 flex items-center space-x-2">
               <Checkbox
@@ -168,7 +201,7 @@ function Home() {
               <div>
                 <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
                 {task.dueDate && (
-                  <p className={`text-sm ${isOverdue(task.dueDate) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <p className={`text-sm ${isOverdue(task.dueDate, task.completed) ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {format(new Date(task.dueDate), 'PPP')}
                   </p>
                 )}
@@ -193,11 +226,11 @@ function Home() {
                         disabled={loading}
                       />
                       <Popover>
-                        <PopoverTrigger asChild>
+                        <SelectTrigger asChild>
                           <Button variant="outline" disabled={loading}>
                             {editTask.dueDate ? format(new Date(editTask.dueDate), 'PPP') : 'Data'}
                           </Button>
-                        </PopoverTrigger>
+                        </SelectTrigger>
                         <PopoverContent className="w-auto p-0">
                           <Calendar
                             mode="single"

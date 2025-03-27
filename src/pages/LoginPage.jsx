@@ -13,18 +13,21 @@ function LoginPage({ onLoginSuccess }) {
     setLoading(true);
     try {
       const res = await axios.post('https://taskmaster-backend-ceqf.onrender.com/api/auth/login', { email, password }, { timeout: 30000 });
-      localStorage.setItem('token', res.data.token);
+      const token = res.data.token;
+      console.log('Token recebido:', token); // Novo log
+      localStorage.setItem('token', token);
       alert('Login bem-sucedido!');
       onLoginSuccess();
     } catch (error) {
-      alert('Erro ao fazer login');
+      console.error('Erro ao fazer login:', error.response?.data || error.message);
+      alert('Erro ao fazer login: ' + (error.response?.data?.error || 'Tente novamente'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Login - TaskMaster</CardTitle>
