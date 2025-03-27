@@ -8,7 +8,6 @@ function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Persistência: verifica o localStorage ou prefere o sistema
     const saved = localStorage.getItem('theme');
     return saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
@@ -30,10 +29,10 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen p-4 bg-background text-foreground dark:bg-gray-900 dark:text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {isAuthenticated ? (
         <>
-          <div className="flex justify-between mb-4">
+          <div className="flex justify-between mb-4 p-4">
             <Button onClick={handleLogout}>Sair</Button>
             <Button onClick={() => setIsDarkMode(!isDarkMode)}>
               {isDarkMode ? 'Claro' : 'Escuro'}
@@ -43,7 +42,7 @@ function App() {
         </>
       ) : (
         <>
-          <div className="flex justify-center space-x-4 mb-6">
+          <div className="flex justify-center space-x-4 mb-6 p-4">
             <Button onClick={() => setIsLogin(true)} variant={isLogin ? 'default' : 'outline'}>
               Login
             </Button>
