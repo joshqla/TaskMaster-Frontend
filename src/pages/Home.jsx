@@ -10,12 +10,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogFooter } from '@/components/ui/alert-dialog'; // Corrigidoimport { format } from 'date-fns';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogFooter } from '@/components/ui/alert-dialog'; // Corrigido
+import { format } from 'date-fns';
 import axios from 'axios';
 
-
 function Home() {
-  const [tasks, setTasks] = useState([]); // Já inicializado como array vazio
+  const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
@@ -33,13 +33,14 @@ function Home() {
       if (!token) return;
       setLoading(true);
       try {
+        console.log('[1] Buscando tarefas com sort:', sortBy); // Log 1: Ordenação
         const res = await axios.get(`https://taskmaster-backend-ceqf.onrender.com/api/tasks?sort=${sortBy}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setTasks(res.data || []); // Garante que tasks é sempre um array
+        setTasks(res.data || []);
       } catch (error) {
         console.error('Erro ao buscar tarefas:', error.response?.data || error.message);
-        setTasks([]); // Em caso de erro, seta como vazio
+        setTasks([]);
       } finally {
         setLoading(false);
       }
@@ -51,6 +52,7 @@ function Home() {
     if (!token) return;
     setLoading(true);
     try {
+      console.log('[2] Adicionando tarefa:', { title, description, priority, dueDate }); // Log 2: Descrição
       const res = await axios.post(
         'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
         { title, description, priority, dueDate },
@@ -72,6 +74,7 @@ function Home() {
     if (!editTask || !token) return;
     setLoading(true);
     try {
+      console.log('[3] Atualizando tarefa:', editTask); // Log 3: Edição
       const res = await axios.put(
         `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${editTask._id}`,
         editTask,
@@ -90,6 +93,7 @@ function Home() {
     if (!token || !deleteTaskId) return;
     setLoading(true);
     try {
+      console.log('[6] Excluindo tarefa com ID:', deleteTaskId); // Log 6: Confirmação de exclusão
       await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${deleteTaskId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -106,6 +110,7 @@ function Home() {
     if (!token) return;
     setLoading(true);
     try {
+      console.log('[10] Alterando status da tarefa:', task._id, 'para', !task.completed); // Log 10: Datas de conclusão
       const updatedTask = { ...task, completed: !task.completed };
       const res = await axios.put(
         `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${task._id}`,
@@ -121,6 +126,7 @@ function Home() {
   };
 
   const handleExportTasks = () => {
+    console.log('[5] Exportando tarefas:', tasks.length); // Log 5: Exportar
     const json = JSON.stringify(tasks, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -138,6 +144,7 @@ function Home() {
     reader.onload = async (event) => {
       try {
         const importedTasks = JSON.parse(event.target.result);
+        console.log('[5] Importando tarefas:', importedTasks.length); // Log 5: Importar
         for (const task of importedTasks) {
           await axios.post(
             'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
@@ -158,6 +165,7 @@ function Home() {
   };
 
   const handleLogout = () => {
+    console.log('[7] Logout realizado'); // Log 7: Logout
     localStorage.removeItem('token');
     window.location.href = '/login';
   };
@@ -173,12 +181,14 @@ function Home() {
     const matchesSearch =
       task.title.toLowerCase().includes(search.toLowerCase()) ||
       (task.description && task.description.toLowerCase().includes(search.toLowerCase()));
+    console.log('[4] Filtrando tarefa:', task.title, 'matchesFilter:', matchesFilter, 'matchesSearch:', matchesSearch); // Log 4: Busca
     return matchesFilter && matchesSearch;
   });
 
   const overdueCount = (tasks || []).filter((t) => isOverdue(t.dueDate, t.completed)).length;
   const pendingCount = (tasks || []).filter((t) => !t.completed).length;
   const completedCount = (tasks || []).filter((t) => t.completed).length;
+  console.log('[3] Contagem de tarefas - Vencidas:', overdueCount, 'Pendentes:', pendingCount, 'Concluídas:', completedCount); // Log 3: Notificações
 
   return (
     <div className="p-4 max-w-2xl mx-auto bg-background">
@@ -210,7 +220,7 @@ function Home() {
             <Calendar mode="single" selected={dueDate} onSelect={setDueDate} disabled={loading} />
           </PopoverContent>
         </Popover>
-        <Select value={priority} onValueChange={setPriority} disabled={loading}>
+        <Select value={priority} onValueChange={(val) => { setPriority(val); console.log('[2] Prioridade alterada para:', val); }} disabled={loading}> {/* Log 2: Prioridade */}
           <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Prioridade" />
           </SelectTrigger>
@@ -284,7 +294,7 @@ function Home() {
         {filteredTasks.map((task) => (
           <Card
             key={task._id}
-            className={`flex items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`}
+            className={`flex items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`} // Log 8: Melhorias visuais implícitas
           >
             <CardContent className="p-4 flex items-center space-x-2 w-full">
               <Checkbox
