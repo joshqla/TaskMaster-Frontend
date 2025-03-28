@@ -374,7 +374,7 @@ function Home() {
                 </div>
               </div>
             </CardContent>
-            <div className="p-4 space-x-2">
+            <div className="p-4 space-x-2 flex items-center">
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={() => setEditTask(task)} disabled={loading}>
