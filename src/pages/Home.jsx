@@ -98,7 +98,7 @@ function Home() {
     if (!editTask || !token) return;
     setLoading(true);
     try {
-      const tagArray = editTask.tags.join(',').split(',').map(t => t.trim()).filter(t => t);
+      const tagArray = editTask.tags ? editTask.tags.filter(t => t) : []; // Array direto, sem join
       const res = await axios.put(
         `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${editTask._id}`,
         { ...editTask, tags: tagArray },
@@ -108,6 +108,7 @@ function Home() {
       setEditTask(null);
       toast.success('Tarefa atualizada!');
     } catch (error) {
+      console.error('Erro no frontend:', error.response?.data || error.message);
       toast.error('Erro ao atualizar tarefa');
     } finally {
       setLoading(false);
