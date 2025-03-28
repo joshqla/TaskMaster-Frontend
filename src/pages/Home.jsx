@@ -14,6 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { format } from 'date-fns';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 
 function Home() {
   const [tasks, setTasks] = useState([]);
@@ -30,6 +32,7 @@ function Home() {
   const [deleteTaskId, setDeleteTaskId] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const token = localStorage.getItem('token');
+  const [reminderOffset, setReminderOffset] = useState('7200000');
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -73,7 +76,7 @@ function Home() {
       const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
       const res = await axios.post(
         'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
-        { title, description, priority, dueDate, tags: tagArray },
+        { title, description, priority, dueDate, tags: tagArray, reminderOffset },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setTasks((prevTasks) => [...prevTasks, res.data]);
@@ -82,6 +85,7 @@ function Home() {
       setPriority('medium');
       setDueDate(null);
       setTags('');
+      setReminderOffset('7200000');
       toast.success('Tarefa adicionada!');
     } catch (error) {
       toast.error('Erro ao adicionar tarefa');
@@ -250,11 +254,19 @@ function Home() {
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" disabled={loading}>
-              {dueDate ? format(dueDate, 'PPP') : 'Data'}
+              {dueDate ? format(dueDate, 'PPP HH:mm') : 'Data e Hora'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
-            <Calendar mode="single" selected={dueDate} onSelect={setDueDate} disabled={loading} />
+            <DatePicker
+              selected={dueDate}
+              onChange={(date) => setDueDate(date || new Date())}
+              showTimeSelect
+              timeFormat="HH:mm"
+              timeIntervals={15}
+              dateFormat="MMMM d, yyyy h:mm aa"
+              inline
+            />
           </PopoverContent>
         </Popover>
         <Select value={priority} onValueChange={setPriority} disabled={loading}>
@@ -267,6 +279,17 @@ function Home() {
             <SelectItem value="high">Alta</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={reminderOffset} onValueChange={setReminderOffset} disabled={loading}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Lembrete" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1800000">30 minutos antes</SelectItem>
+            <SelectItem value="3600000">1 hora antes</SelectItem>
+            <SelectItem value="7200000">2 horas antes</SelectItem>
+            <SelectItem value="18000000">5 horas antes</SelectItem>
+          </SelectContent>
+        </Select>        
         <Button onClick={handleAddTask} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
         </Button>
