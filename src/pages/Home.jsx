@@ -33,6 +33,24 @@ function Home() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const token = localStorage.getItem('token');
   const [reminderOffset, setReminderOffset] = useState('7200000');
+  const [userEmail, setUserEmail] = useState('');
+
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!token) return;
+      try {
+        const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserEmail(res.data.email);
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error);
+      }
+    };
+    fetchUser();
+  }, [token]);
+
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -228,16 +246,19 @@ function Home() {
       <Toaster />
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Minhas Tarefas</h1>
-        <div className="space-x-2">
-          <Button variant="outline" onClick={toggleTheme} disabled={loading}>
-            {theme === 'light' ? 'Escuro' : 'Claro'}
-          </Button>
-          <Button variant="outline" onClick={() => window.location.href = '/dashboard'} disabled={loading}>
-            Dashboard
-          </Button>
-          <Button variant="outline" onClick={handleLogout} disabled={loading}>
-            Logout
-          </Button>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-muted-foreground">Logado como: {userEmail}</span>
+          <div className="space-x-2">
+            <Button variant="outline" onClick={toggleTheme} disabled={loading}>
+              {theme === 'light' ? 'Escuro' : 'Claro'}
+            </Button>
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard'} disabled={loading}>
+              Dashboard
+            </Button>
+            <Button variant="outline" onClick={handleLogout} disabled={loading}>
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
       <div className="flex space-x-2 mb-4">
