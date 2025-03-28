@@ -390,11 +390,11 @@ function Home() {
                 <div className="text-xs text-muted-foreground">
                   {task.dueDate && (
                     <span className={isOverdue(task.dueDate, task.completed) ? 'text-destructive' : ''}>
-                      Vence: {format(new Date(task.dueDate), 'PPP')}
+                      Vence: {format(new Date(task.dueDate), 'PPP HH:mm')}
                     </span>
                   )}
-                  {task.dueDate && ' | '}Criada: {format(new Date(task.createdAt), 'PPP')}
-                  {task.completedAt && ` | Concluída: ${format(new Date(task.completedAt), 'PPP')}`}
+                  {task.dueDate && ' | '}Criada: {format(new Date(task.createdAt), 'PPP HH:mm')}
+                  {task.completedAt && ` | Concluída: ${format(new Date(task.completedAt), 'PPP HH:mm')}`}
                 </div>
               </div>
             </CardContent>
