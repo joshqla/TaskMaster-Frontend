@@ -18,6 +18,16 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
 function Home() {
+
+  // Verifica se o token existe antes de renderizar a página
+
+  
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = '/login';
+    return null;
+  }
+
   const [tasks, setTasks] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -31,27 +41,21 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [deleteTaskId, setDeleteTaskId] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  const token = localStorage.getItem('token');
   const [reminderOffset, setReminderOffset] = useState('7200000');
   const [userEmail, setUserEmail] = useState('');
 
+  // Função pra calcular tempo restante
+  const getTimeRemaining = (dueDate) => {
+    const now = new Date();
+    const diff = new Date(dueDate) - now;
+    if (diff <= 0) return 'Vencida';
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    return `Faltam ${hours}h ${minutes}min`;
+  };
+  
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (!token) return;
-      try {
-        const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUserEmail(res.data.email);
-      } catch (error) {
-        console.error('Erro ao buscar usuário:', error);
-      }
-    };
-    fetchUser();
-  }, [token]);
-
-
+  // Fetch inicial de tarefas e usuário
   useEffect(() => {
     const fetchTasks = async () => {
       if (!token) return;
@@ -62,14 +66,41 @@ function Home() {
         });
         setTasks(res.data || []);
       } catch (error) {
-        console.error('Erro ao buscar tarefas:', error.response?.data || error.message);
+        console.error('Erro ao buscar tarefas:', error);
         setTasks([]);
       } finally {
         setLoading(false);
       }
     };
+
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get('https://taskmaster-backend-ceqf.onrender.com/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserEmail(res.data.email);
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error);
+      }
+    };
+
     fetchTasks();
-  }, [token, sortBy]); // Removido "tasks" das dependências pra evitar loop
+    fetchUser();
+  }, [token, sortBy]);
+
+  // useEffect pra atualizar o contador em tempo real
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTasks((prevTasks) =>
+        prevTasks.map((task) => ({
+          ...task,
+          timeRemaining: task.dueDate && !task.completed ? getTimeRemaining(task.dueDate) : null,
+        }))
+      );
+    }, 60000); // Atualiza a cada minuto pra não pesar
+
+    return () => clearInterval(interval); // Limpa o interval ao desmontar
+  }, [tasks]);
 
   useEffect(() => {
     if (!token) return;
@@ -380,44 +411,49 @@ function Home() {
         </div>
       )}
       <div className="space-y-2">
-        {filteredTasks.map((task) => (
-          <Card
-            key={task._id}
-            className={`flex items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`}
-          >
-            <CardContent className="p-4 flex items-center space-x-2 w-full">
-              <Checkbox
-                checked={task.completed}
-                onCheckedChange={() => handleToggleComplete(task)}
-                disabled={loading}
-              />
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  {task.priority === 'high' && <Flame className="h-4 w-4 text-red-500" />}
-                  {task.priority === 'medium' && <Tag className="h-4 w-4 text-yellow-500" />}
-                  {task.priority === 'low' && <Sprout className="h-4 w-4 text-green-500" />}
-                  <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
-                </div>
-                {task.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-                )}
-                {task.tags && task.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {task.tags.map((tag) => (
-                      <Badge key={tag} variant="outline">{tag}</Badge>
-                    ))}
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground">
-                  {task.dueDate && (
-                    <span className={isOverdue(task.dueDate, task.completed) ? 'text-destructive' : ''}>
-                      Vence: {format(new Date(task.dueDate), 'PPP HH:mm')}
-                    </span>
-                  )}
-                  {task.dueDate && ' | '}Criada: {format(new Date(task.createdAt), 'PPP HH:mm')}
-                  {task.completedAt && ` | Concluída: ${format(new Date(task.completedAt), 'PPP HH:mm')}`}
-                </div>
+    {filteredTasks.map((task) => (
+      <Card
+        key={task._id}
+        className={`flex items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`}
+      >
+        <CardContent className="p-4 flex items-center space-x-2 w-full">
+          <Checkbox
+            checked={task.completed}
+            onCheckedChange={() => handleToggleComplete(task)}
+            disabled={loading}
+          />
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              {task.priority === 'high' && <Flame className="h-4 w-4 text-red-500" />}
+              {task.priority === 'medium' && <Tag className="h-4 w-4 text-yellow-500" />}
+              {task.priority === 'low' && <Sprout className="h-4 w-4 text-green-500" />}
+              <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
+            </div>
+            {task.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
+            )}
+            {task.tags && task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {task.tags.map((tag) => (
+                  <Badge key={tag} variant="outline">{tag}</Badge>
+                ))}
               </div>
+            )}
+            <div className="text-xs text-muted-foreground">
+              {task.dueDate && (
+                <span className={isOverdue(task.dueDate, task.completed) ? 'text-destructive' : ''}>
+                  Vence: {format(new Date(task.dueDate), 'PPP HH:mm')}
+                </span>
+              )}
+              {task.dueDate && !task.completed && (
+                <span className={isOverdue(task.dueDate, task.completed) ? 'text-destructive' : ''}>
+                  {' | '}{task.timeRemaining || getTimeRemaining(task.dueDate)}
+                </span>
+              )}
+              {task.dueDate && ' | '}Criada: {format(new Date(task.createdAt), 'PPP HH:mm')}
+              {task.completedAt && ` | Concluída: ${format(new Date(task.completedAt), 'PPP HH:mm')}`}
+            </div>
+          </div> 
             </CardContent>
             <div className="p-4 space-x-2 flex items-center">
               <Dialog>
