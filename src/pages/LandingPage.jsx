@@ -12,7 +12,12 @@ function LandingPage() {
         <Button onClick={() => window.location.href = '/login'} size="lg">
           Login
         </Button>
-        <Button onClick={() => window.location.href = '/login'} variant="outline" size="lg">
+        <Button 
+          onClick={() => window.location.href = '/register'} 
+          variant="secondary" // Mudado pra "secondary" pra ficar visível
+          size="lg"
+          className="bg-white text-blue-600 hover:bg-gray-100"
+        >
           Registrar
         </Button>
       </div>

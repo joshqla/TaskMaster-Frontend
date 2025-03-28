@@ -4,17 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Tag, AlertTriangle, Flame, Sprout } from 'lucide-react';
+import { Loader2, Tag, Flame, Sprout } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, AlertDialogFooter } from '@/components/ui/alert-dialog';
-import { Toggle } from '@/components/ui/toggle';
 import { format } from 'date-fns';
 import axios from 'axios';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 function Home() {
   const [tasks, setTasks] = useState([]);
@@ -33,11 +32,6 @@ function Home() {
   const token = localStorage.getItem('token');
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
     const fetchTasks = async () => {
       if (!token) return;
       setLoading(true);
@@ -47,34 +41,42 @@ function Home() {
         });
         setTasks(res.data || []);
       } catch (error) {
-        console.error('Erro ao buscar tarefas:', error);
+        console.error('Erro ao buscar tarefas:', error.response?.data || error.message);
         setTasks([]);
       } finally {
         setLoading(false);
       }
     };
     fetchTasks();
+  }, [token, sortBy]); // Removido "tasks" das dependências pra evitar loop
 
+  useEffect(() => {
+    if (!token) return;
     const checkOverdue = setInterval(() => {
-      const overdue = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && !t.completed);
-      if (overdue.length) {
-        toast.error(`${overdue.length} tarefa${overdue.length > 1 ? 's' : ''} vencida${overdue.length > 1 ? 's' : ''}!`);
-      }
-    }, 60000); // 1 minuto
+      tasks.forEach((task) => {
+        if (new Date(task.dueDate) < new Date() && !task.completed) {
+          toast(`Tarefa "${task.title}" está vencida!`, { icon: '⏰', id: task._id }); // ID pra evitar duplicatas
+        }
+      });
+    }, 60000); // Checa a cada 60s, sem requisições
+
     return () => clearInterval(checkOverdue);
-  }, [token, sortBy, tasks]);
+  }, [tasks, token]); // Só depende de tasks e token
 
   const handleAddTask = async () => {
-    if (!token) return;
+    if (!token || title.length < 3) {
+      toast.error('Título deve ter pelo menos 3 caracteres');
+      return;
+    }
     setLoading(true);
     try {
-      const taskTags = tags.split(',').map((t) => t.trim()).filter((t) => t);
+      const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
       const res = await axios.post(
         'https://taskmaster-backend-ceqf.onrender.com/api/tasks',
-        { title, description, priority, dueDate, tags: taskTags },
+        { title, description, priority, dueDate, tags: tagArray },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks((prev) => [...prev, res.data]);
+      setTasks((prevTasks) => [...prevTasks, res.data]);
       setTitle('');
       setDescription('');
       setPriority('medium');
@@ -92,13 +94,13 @@ function Home() {
     if (!editTask || !token) return;
     setLoading(true);
     try {
-      const taskTags = editTask.tags.join(', ');
+      const tagArray = editTask.tags.join(',').split(',').map(t => t.trim()).filter(t => t);
       const res = await axios.put(
         `https://taskmaster-backend-ceqf.onrender.com/api/tasks/${editTask._id}`,
-        { ...editTask, tags: taskTags.split(',').map((t) => t.trim()).filter((t) => t) },
+        { ...editTask, tags: tagArray },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks((prev) => prev.map((t) => (t._id === editTask._id ? res.data : t)));
+      setTasks((prevTasks) => prevTasks.map((t) => (t._id === editTask._id ? res.data : t)));
       setEditTask(null);
       toast.success('Tarefa atualizada!');
     } catch (error) {
@@ -115,7 +117,7 @@ function Home() {
       await axios.delete(`https://taskmaster-backend-ceqf.onrender.com/api/tasks/${deleteTaskId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTasks((prev) => prev.filter((t) => t._id !== deleteTaskId));
+      setTasks((prevTasks) => prevTasks.filter((t) => t._id !== deleteTaskId));
       setDeleteTaskId(null);
       toast.success('Tarefa excluída!');
     } catch (error) {
@@ -135,8 +137,8 @@ function Home() {
         updatedTask,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setTasks((prev) => prev.map((t) => (t._id === task._id ? res.data : t)));
-      toast.success(`Tarefa ${res.data.completed ? 'concluída' : 'reaberta'}!`);
+      setTasks((prevTasks) => prevTasks.map((t) => (t._id === task._id ? res.data : t)));
+      toast.success(`Tarefa ${updatedTask.completed ? 'concluída' : 'reaberta'}!`);
     } catch (error) {
       toast.error('Erro ao atualizar status');
     } finally {
@@ -150,7 +152,7 @@ function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'tasks.json';
+    a.download = 'tasks.json'; // String corrigida, sem duplicatas ou erros
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Tarefas exportadas!');
@@ -188,6 +190,13 @@ function Home() {
     toast.success('Logout realizado!');
   };
 
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
+
   const isOverdue = (date, completed) => date && new Date(date) < new Date() && !completed;
 
   const filteredTasks = useMemo(() => {
@@ -200,7 +209,7 @@ function Home() {
       const matchesSearch =
         task.title.toLowerCase().includes(search.toLowerCase()) ||
         (task.description && task.description.toLowerCase().includes(search.toLowerCase())) ||
-        (task.tags && task.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase())));
+        (task.tags && task.tags.some(tag => tag.toLowerCase().includes(search.toLowerCase())));
       return matchesFilter && matchesSearch;
     });
   }, [tasks, filter, search]);
@@ -210,14 +219,15 @@ function Home() {
   const completedCount = filteredTasks.filter((t) => t.completed).length;
 
   return (
-    <div className={`p-4 max-w-4xl mx-auto ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-background'}`}>
+    <div className={`p-4 max-w-2xl mx-auto ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-background'}`}>
+      <Toaster />
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Minhas Tarefas</h1>
-        <div className="flex space-x-2">
-          <Toggle pressed={theme === 'dark'} onPressedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </Toggle>
-          <Button variant="outline" onClick={() => (window.location.href = '/dashboard')}>
+        <div className="space-x-2">
+          <Button variant="outline" onClick={toggleTheme} disabled={loading}>
+            {theme === 'light' ? 'Escuro' : 'Claro'}
+          </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/dashboard'} disabled={loading}>
             Dashboard
           </Button>
           <Button variant="outline" onClick={handleLogout} disabled={loading}>
@@ -228,53 +238,43 @@ function Home() {
       <div className="flex space-x-2 mb-4">
         <Badge variant="secondary">Pendentes: {pendingCount}</Badge>
         <Badge variant="success">Concluídas: {completedCount}</Badge>
-        {overdueCount > 0 && (
-          <Badge variant="destructive">
-            <AlertTriangle className="h-4 w-4 mr-1" /> Vencidas: {overdueCount}
-          </Badge>
-        )}
+        {overdueCount > 0 && <Badge variant="destructive">Vencidas: {overdueCount}</Badge>}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className="flex flex-col space-y-2 mb-4 md:flex-row md:space-y-0 md:space-x-2">
         <Input
           placeholder="Nova tarefa"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={loading}
         />
-        <div className="flex space-x-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" disabled={loading}>
-                {dueDate ? format(dueDate, 'PPP') : 'Data'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar mode="single" selected={dueDate} onSelect={setDueDate} disabled={loading} />
-            </PopoverContent>
-          </Popover>
-          <Select value={priority} onValueChange={setPriority} disabled={loading}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Prioridade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">
-                <Sprout className="h-4 w-4 inline mr-2" /> Baixa
-              </SelectItem>
-              <SelectItem value="medium">Média</SelectItem>
-              <SelectItem value="high">
-                <Flame className="h-4 w-4 inline mr-2" /> Alta
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleAddTask} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
-          </Button>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" disabled={loading}>
+              {dueDate ? format(dueDate, 'PPP') : 'Data'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar mode="single" selected={dueDate} onSelect={setDueDate} disabled={loading} />
+          </PopoverContent>
+        </Popover>
+        <Select value={priority} onValueChange={setPriority} disabled={loading}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Baixa</SelectItem>
+            <SelectItem value="medium">Média</SelectItem>
+            <SelectItem value="high">Alta</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button onClick={handleAddTask} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
+        </Button>
       </div>
       <Textarea
-        placeholder="Descrição (máx. 200 caracteres)"
+        placeholder="Descrição (máx. 500 caracteres)"
         value={description}
-        onChange={(e) => e.target.value.length <= 200 && setDescription(e.target.value)}
+        onChange={(e) => setDescription(e.target.value.slice(0, 500))}
         className="mb-4"
         disabled={loading}
       />
@@ -285,7 +285,7 @@ function Home() {
         className="mb-4"
         disabled={loading}
       />
-      <div className="flex space-x-2 mb-4">
+      <div className="flex flex-col space-y-2 mb-4 md:flex-row md:space-y-0 md:space-x-2">
         <Input
           placeholder="Buscar tarefas..."
           value={search}
@@ -338,7 +338,7 @@ function Home() {
         {filteredTasks.map((task) => (
           <Card
             key={task._id}
-            className={`flex flex-col md:flex-row items-start md:items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`}
+            className={`flex items-center justify-between animate-in slide-in-from-top-3 duration-500 ${isOverdue(task.dueDate, task.completed) ? 'animate-shake border-destructive' : ''} ${task.priority === 'high' ? 'border-red-500' : task.priority === 'medium' ? 'border-yellow-500' : 'border-green-500'}`}
           >
             <CardContent className="p-4 flex items-center space-x-2 w-full">
               <Checkbox
@@ -348,12 +348,20 @@ function Home() {
               />
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
-                  <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
                   {task.priority === 'high' && <Flame className="h-4 w-4 text-red-500" />}
+                  {task.priority === 'medium' && <Tag className="h-4 w-4 text-yellow-500" />}
                   {task.priority === 'low' && <Sprout className="h-4 w-4 text-green-500" />}
+                  <span className={task.completed ? 'line-through' : ''}>{task.title}</span>
                 </div>
                 {task.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
+                )}
+                {task.tags && task.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {task.tags.map((tag) => (
+                      <Badge key={tag} variant="outline">{tag}</Badge>
+                    ))}
+                  </div>
                 )}
                 <div className="text-xs text-muted-foreground">
                   {task.dueDate && (
@@ -364,24 +372,9 @@ function Home() {
                   {task.dueDate && ' | '}Criada: {format(new Date(task.createdAt), 'PPP')}
                   {task.completedAt && ` | Concluída: ${format(new Date(task.completedAt), 'PPP')}`}
                 </div>
-                {task.tags && task.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {task.tags.map((tag) => (
-                      <Badge key={tag} variant="outline">
-                        <Tag className="h-3 w-3 mr-1" /> {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {task.history && task.history.length > 1 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Última edição: {task.history[task.history.length - 1].action} em{' '}
-                    {format(new Date(task.history[task.history.length - 1].date), 'PPP')}
-                  </p>
-                )}
               </div>
             </CardContent>
-            <div className="p-4 space-x-2 flex-shrink-0">
+            <div className="p-4 space-x-2">
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline" onClick={() => setEditTask(task)} disabled={loading}>
@@ -401,10 +394,14 @@ function Home() {
                       />
                       <Textarea
                         value={editTask.description || ''}
-                        onChange={(e) =>
-                          e.target.value.length <= 200 && setEditTask({ ...editTask, description: e.target.value })
-                        }
+                        onChange={(e) => setEditTask({ ...editTask, description: e.target.value.slice(0, 500) })}
                         placeholder="Descrição"
+                        disabled={loading}
+                      />
+                      <Input
+                        value={editTask.tags ? editTask.tags.join(', ') : ''}
+                        onChange={(e) => setEditTask({ ...editTask, tags: e.target.value.split(',').map(t => t.trim()) })}
+                        placeholder="Tags (separadas por vírgula)"
                         disabled={loading}
                       />
                       <Popover>
@@ -431,21 +428,11 @@ function Home() {
                           <SelectValue placeholder="Prioridade" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">
-                            <Sprout className="h-4 w-4 inline mr-2" /> Baixa
-                          </SelectItem>
+                          <SelectItem value="low">Baixa</SelectItem>
                           <SelectItem value="medium">Média</SelectItem>
-                          <SelectItem value="high">
-                            <Flame className="h-4 w-4 inline mr-2" /> Alta
-                          </SelectItem>
+                          <SelectItem value="high">Alta</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Input
-                        value={editTask.tags ? editTask.tags.join(', ') : ''}
-                        onChange={(e) => setEditTask({ ...editTask, tags: e.target.value.split(',').map((t) => t.trim()) })}
-                        placeholder="Tags (separadas por vírgula)"
-                        disabled={loading}
-                      />
                       <Checkbox
                         checked={editTask.completed}
                         onCheckedChange={(checked) => setEditTask({ ...editTask, completed: checked })}
